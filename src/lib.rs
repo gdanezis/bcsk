@@ -56,25 +56,28 @@ impl BinaryCountSketch {
         }
     }
 
-    #[inline]
     pub fn toggle<V: Item>(&mut self, v: &V) {
-        let l = self.words.len();
+        let l = self.words.len() * 64;
         for i in 0..self.points {
-            let b = v.get_code(i) % (l * 64);
+            let b = v.get_code(i) % l;
             self.words[b / 64] ^= 1 << (b % 64);
         }
     }
 
     pub fn check<V: Item>(&self, v: &V) -> usize {
-        let mut count = 0;
         let l = self.words.len();
-        for i in 0..self.points {
-            let b = v.get_code(i) % (l * 64);
-            if self.words[b / 64] & (1 << (b % 64)) != 0 {
-                count += 1;
-            }
-        }
-        count
+
+        (0..self.points)
+            .into_iter()
+            .map(|i| {
+                let b = v.get_code(i) % (l * 64);
+                if self.words[b / 64] & (1 << (b % 64)) != 0 {
+                    1usize
+                } else {
+                    0usize
+                }
+            })
+            .sum()
     }
 
     pub fn decode<V: Item>(&self, items: &[V]) -> Vec<usize> {
