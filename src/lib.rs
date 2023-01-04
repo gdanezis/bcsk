@@ -110,35 +110,36 @@ impl BinaryCountSketch {
         (false_pos, false_neg)
     }
 }
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct TestItem {
+    points: Vec<usize>,
+}
+
+impl TestItem {
+    pub fn new() -> Self {
+        TestItem {
+            points: vec![
+                rand::random::<usize>(),
+                rand::random::<usize>(),
+                rand::random::<usize>(),
+                rand::random::<usize>(),
+                rand::random::<usize>(),
+            ],
+        }
+    }
+}
+
+impl Item for TestItem {
+    fn get_code(&self, i: u64) -> usize {
+        self.points[i as usize]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use test::Bencher;
-
-    #[derive(Clone)]
-    struct TestItem {
-        points: Vec<usize>,
-    }
-
-    impl TestItem {
-        fn new() -> Self {
-            TestItem {
-                points: vec![
-                    rand::random::<usize>(),
-                    rand::random::<usize>(),
-                    rand::random::<usize>(),
-                    rand::random::<usize>(),
-                    rand::random::<usize>(),
-                ],
-            }
-        }
-    }
-
-    impl Item for TestItem {
-        fn get_code(&self, i: u64) -> usize {
-            self.points[i as usize]
-        }
-    }
 
     #[test]
     fn test_basics() {
