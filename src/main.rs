@@ -35,8 +35,8 @@ fn main() {
         sketch2.toggle(&item);
     }
 
-    sketch2.diff_with(&sketch1);
-    let (fpos, fneg) = sketch2.estimate_stats(samples_num as usize, threshold as usize);
+    sketch2.diff_with(&sketch1).expect("No errors");
+    let (fpos, fneg) = sketch2.estimate_stats(samples_num as usize, threshold as usize).expect("No errors");
 
     let mut candidates = vec![];
     candidates.append(&mut common.clone());

@@ -1,10 +1,30 @@
 #![feature(test)]
 
+use std::fmt;
+use std::error::Error;
+
 extern crate test;
 
 pub trait Item {
     fn get_code(&self, i: u64) -> usize;
 }
+
+#[derive(Debug)]
+pub struct BinaryCountSketchError { details: String }
+
+impl BinaryCountSketchError {
+    pub fn new(details:&str) -> Self {
+        BinaryCountSketchError { details: details.to_string() }
+    }
+}
+
+impl fmt::Display for BinaryCountSketchError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Sketch Error: {}", self.details)
+    }
+}
+
+impl Error for BinaryCountSketchError {}
 
 pub struct BinaryCountSketch {
     base_length: u64,
@@ -27,8 +47,8 @@ impl BinaryCountSketch {
         self.words.len() * 64
     }
 
-    pub fn level_down(&self, new_level: u64) -> Self {
-        assert!(new_level < self.level);
+    pub fn level_down(&self, new_level: u64) -> Result<Self,BinaryCountSketchError> {
+        if !(new_level < self.level) { return Err(BinaryCountSketchError::new("Incorrect level")); }
 
         let mut new_words = vec![0; (self.base_length << new_level) as usize];
         let l = new_words.len();
@@ -37,23 +57,25 @@ impl BinaryCountSketch {
             new_words[i % l] ^= *val;
         }
 
-        BinaryCountSketch {
+        Ok(BinaryCountSketch {
             base_length: self.base_length,
             level: new_level,
             points: self.points,
             words: new_words,
-        }
+        })
     }
 
-    pub fn diff_with(&mut self, other: &Self) {
-        assert!(self.base_length == other.base_length);
-        assert!(self.level == other.level);
-        assert!(self.points == other.points);
-        assert!(self.words.len() == other.words.len());
+    pub fn diff_with(&mut self, other: &Self) -> Result<(),BinaryCountSketchError> {
+        if !(self.base_length == other.base_length) { return Err(BinaryCountSketchError::new("Incorrect base length")); }
+        if !(self.level == other.level) { return Err(BinaryCountSketchError::new("Incorrect level")); }
+        if !(self.points == other.points) { return Err(BinaryCountSketchError::new("Incorrect points")); }
+        if !(self.words.len() == other.words.len()) { return Err(BinaryCountSketchError::new("Incorrect words length")); }
 
         for (i, val) in other.words.iter().enumerate() {
             self.words[i] ^= *val;
         }
+
+        Ok(())
     }
 
     pub fn toggle<V: Item>(&mut self, v: &V) {
@@ -84,8 +106,8 @@ impl BinaryCountSketch {
         items.iter().map(|item| self.check(item)).collect()
     }
 
-    pub fn estimate_stats(&self, samples: usize, threshold: usize) -> (usize, usize) {
-        assert!(threshold <= self.points as usize);
+    pub fn estimate_stats(&self, samples: usize, threshold: usize) -> Result<(usize, usize), BinaryCountSketchError> {
+        if !(threshold <= self.points as usize) { return Err(BinaryCountSketchError::new("Incorrect threshold")); }
 
         struct Rand;
         impl Item for Rand {
@@ -107,7 +129,7 @@ impl BinaryCountSketch {
             }
         }
 
-        (false_pos, false_neg)
+        Ok((false_pos, false_neg))
     }
 }
 
@@ -194,7 +216,7 @@ mod tests {
         sketch.toggle(&item);
         assert_eq!(sketch.decode(&[item.clone()]), vec![3]);
 
-        let (fpos, fneg) = sketch.estimate_stats(100, 2);
+        let (fpos, fneg) = sketch.estimate_stats(100, 2).expect("No errors");
         assert!(fpos < 5);
         assert!(fneg < 5)
     }
@@ -214,7 +236,7 @@ mod tests {
         sketch2.toggle(&item3);
         assert_eq!(sketch1.decode(&[item.clone()]), vec![3]);
 
-        sketch1.diff_with(&sketch2);
+        sketch1.diff_with(&sketch2).expect("No errors");
         assert_eq!(sketch1.decode(&[item.clone()]), vec![0]);
         assert_eq!(sketch1.decode(&[item2.clone()]), vec![3]);
         assert_eq!(sketch1.decode(&[item3.clone()]), vec![3]);
@@ -234,7 +256,7 @@ mod tests {
         assert!(sketch.words.len() == 1);
         assert!(sketch.words[0] != 0);
 
-        let (fpos, fneg) = sketch.estimate_stats(100, 2);
+        let (fpos, fneg) = sketch.estimate_stats(100, 2).expect("No errors");
         assert!(fpos > 10);
         assert!(fneg > 10)
     }
@@ -262,8 +284,8 @@ mod tests {
             sketch2.toggle(&item);
         }
 
-        sketch2.diff_with(&sketch1);
-        let (fpos, fneg) = sketch2.estimate_stats(100, 4);
+        sketch2.diff_with(&sketch1).expect("No errors");
+        let (fpos, fneg) = sketch2.estimate_stats(100, 4).expect("no errors");
 
         println!("{} bits {} bytes", sketch2.bits(), sketch2.bits() / 8);
         println!("{} {}", fpos, fneg);
